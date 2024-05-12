@@ -19,7 +19,7 @@ const App = () => {
   const [selectedTracks, setSelectedTracks] = useState([]); // State to store selected tracks for export
   const [trackPans, setTrackPans] = useState([]); // State to store track pans
   const audioRefs = useRef([]);
-  const instrumentNames = ['Voice', 'Drums', 'Bass', 'Other'];
+  const [instrumentNames, setInstrumentNames] = useState(['Voice', 'Drums', 'Bass', 'Other']);
 
   const handleFileChange = (event) => {
     setSelectedFile(event.target.files[0]);
@@ -242,12 +242,62 @@ const handleExport = async () => {
     setTrackPans(newPans);
   };
 
+
+const handleDrop = async (event) => {
+  event.preventDefault();
+  const files = event.dataTransfer.files;
+  // Iterate through dropped files
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      console.log('Audio file detected!');
+      const audioData = e.target.result;
+      // Create a new InstrumentTrack for the dropped file
+      const newInstrumentStem = audioData.split(',')[1]; // Extract base64 encoded audio data
+      const formData = new FormData();
+      formData.append('audio_file', file);
+      try {
+        const response = await fetch('http://127.0.0.1:8000/api/get_image/', {
+          method: 'POST',
+          body: formData
+        });
+        if (response.ok) {
+          const data = await response.json();
+          console.log('Waveform image:', data.waveform_image);
+          // Set the new InstrumentTrack's waveform image and audio data
+          setWaveformImages([...waveformImages, data.waveform_image]);
+          setInstrumentStems([...instrumentStems, newInstrumentStem]);
+          // Add new audio index and initialize track pan
+          setAudioIndexes([...audioIndexes, instrumentStems.length]);
+          setOriginalStems([...originalStems, newInstrumentStem]);
+          setTrackPans([...trackPans, 0]);
+          // Extract filename without extension and add it to instrumentNames array
+          const filenameWithoutExtension = file.name.split('.').slice(0, -1).join('.');
+          setInstrumentNames([...instrumentNames, filenameWithoutExtension]);
+        } else {
+          console.error('Error:', response.statusText);
+        }
+      } catch (error) {
+        console.error('Error:', error);
+      }
+    };
+    reader.readAsDataURL(file);
+  }
+};
+
+
+// Step 2: Implement drag over event handler to prevent default behavior
+const handleDragOver = (event) => {
+  event.preventDefault();
+};
+
   return (
     <div>
       <header>
         <h1>AI Instrument Splitter</h1>
       </header>
-      <div className="input-container">
+      <div className="input-container" onDrop={handleDrop} onDragOver={handleDragOver}>
         <input type="file" onChange={handleFileChange} />
         <button className="upload-button" onClick={uploadFile}>Upload</button>
       </div>
@@ -269,7 +319,7 @@ const handleExport = async () => {
       </div>
       <div className="instrument-stems">
         {instrumentStems.length > 0 && instrumentStems.map((instrument, index) => (
-          <InstrumentTrack key={index} index={index} instrument={instrument} waveformImage={waveformImages[index]} audioRefs={audioRefs} handleMuteToggle={handleMuteToggle} handleSoloToggle={handleSoloToggle} handleEffectAdd={handleEffectAdd} handleEffectAdd2={handleEffectAdd2} updateTrackPan={updateTrackPan}/>
+          <InstrumentTrack key={index} index={index} instrument={instrument} waveformImage={waveformImages[index]} audioRefs={audioRefs} handleMuteToggle={handleMuteToggle} handleSoloToggle={handleSoloToggle} handleEffectAdd={handleEffectAdd} handleEffectAdd2={handleEffectAdd2} updateTrackPan={updateTrackPan} stemName={instrumentNames[index]}/>
         ))}
       </div>
       {audioIndexes.map((index) => (
@@ -282,12 +332,19 @@ const handleExport = async () => {
         />
       ))}
       
+      <div>
+        {instrumentStems.length > 0 && (
+          <h3 className="drop" onDrop={handleDrop} onDragOver={handleDragOver}>Drop an audio stem here to load it in the project!</h3>
+         )}
+      </div>
+      
       {/* Render export button only if InstrumentTrack components are present */}
       {instrumentStems.length > 0 && (
         <button className="export-button" onClick={handleExportPopupOpen}>
           Export
         </button>
       )}
+
 
       {exportPopupOpen && (
         <div className="export-popup">
@@ -320,7 +377,7 @@ const handleExport = async () => {
   );
 };
 
-const InstrumentTrack = ({ index, instrument, waveformImage, audioRefs, handleMuteToggle, handleSoloToggle, handleEffectAdd, handleEffectAdd2, updateTrackPan }) => {
+const InstrumentTrack = ({ index, instrument, waveformImage, audioRefs, handleMuteToggle, handleSoloToggle, handleEffectAdd, handleEffectAdd2, updateTrackPan, stemName }) => {
   const instrumentNames = ['Voice', 'Drums', 'Bass', 'Other'];
   const { volume, pan, effects } = instrument;
   const [selectedEffects, setSelectedEffects] = useState(effects || []);
@@ -386,7 +443,7 @@ const InstrumentTrack = ({ index, instrument, waveformImage, audioRefs, handleMu
 
   return (
     <div className="instrument-track">
-      <h3>{instrumentNames[index]}</h3> {/* Display the instrument name based on index */}
+      <h3>{stemName}</h3> {/* Display the instrument name based on index */}
       <div className="instrument-track-settings">
         <div>
           Volume: <span>{currentVolume}</span>
