@@ -22,6 +22,7 @@ urlpatterns = [
     path('api/separate_audio/', separate_audio, name='separate_audio'),
     path('api/process_audio_with_effects/', process_audio_with_effects, name='process_audio_with_effects'),
     path('api/create_export/', create_export, name='create_export'),
+    path('api/get_image/', get_image, name='get_image'),
 ]
 
 

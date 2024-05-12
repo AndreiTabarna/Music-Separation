@@ -273,3 +273,24 @@ def generate_waveform_image_data(audio_file_path):
     image_data = base64.b64encode(buffer.read()).decode('utf-8')
 
     return image_data
+    
+@csrf_exempt
+def get_image(request):
+    if request.method == 'POST' and request.FILES.get('audio_file'):
+        audio_file = request.FILES['audio_file']
+
+        # Save the uploaded file
+        with open('uploaded_audio.wav', 'wb') as f:
+            for chunk in audio_file.chunks():
+                f.write(chunk)
+
+        # Generate waveform image data
+        waveform_image_data = generate_waveform_image_data('uploaded_audio.wav')
+
+        # Remove the temporary uploaded audio file
+        os.remove('uploaded_audio.wav')
+
+        return JsonResponse({'waveform_image': waveform_image_data})
+
+    return JsonResponse({'error': 'Invalid request method or no file provided.'}, status=400)
+
