@@ -16,11 +16,29 @@ from pedalboard.io import AudioFile
 import os
 import zipfile
 from pydub import AudioSegment
+from drf_yasg.utils import swagger_auto_schema
+from drf_yasg import openapi
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
 
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 MAX_MIXTURES = int(1e8)
 
 @csrf_exempt
+@swagger_auto_schema(
+    method='post',
+    operation_description="Create export from audio files",
+    request_body=openapi.Schema(
+        type=openapi.TYPE_OBJECT,
+        properties={
+            'audio_files': openapi.Schema(type=openapi.TYPE_ARRAY, items=openapi.Items(type=openapi.TYPE_STRING, format='binary')),
+            'volume_values': openapi.Schema(type=openapi.TYPE_ARRAY, items=openapi.Items(type=openapi.TYPE_STRING)),
+            'panning_values': openapi.Schema(type=openapi.TYPE_ARRAY, items=openapi.Items(type=openapi.TYPE_STRING)),
+        }
+    ),
+    responses={200: 'Created export'}
+)
+@api_view(['POST'])
 def create_export(request):
     if request.method == 'POST':
         # Check if audio files are provided
@@ -96,8 +114,20 @@ def create_export(request):
     return JsonResponse({'error': 'Invalid request method.'}, status=400)
 
 
-
 @csrf_exempt
+@swagger_auto_schema(
+    method='post',
+    operation_description="Process audio with effects",
+    request_body=openapi.Schema(
+        type=openapi.TYPE_OBJECT,
+        properties={
+            'audio_file': openapi.Schema(type=openapi.TYPE_STRING, format='binary'),
+            'effects': openapi.Schema(type=openapi.TYPE_ARRAY, items=openapi.Items(type=openapi.TYPE_STRING)),
+        }
+    ),
+    responses={200: 'Processed audio'}
+)
+@api_view(['POST'])
 def process_audio_with_effects(request):
     if request.method == 'POST' and request.FILES.get('audio_file'):
         audio_file = request.FILES['audio_file']
@@ -150,8 +180,19 @@ def process_audio_with_effects(request):
     return JsonResponse({'error': 'Invalid request method or no file provided.'}, status=400)
 
 
-
 @csrf_exempt
+@swagger_auto_schema(
+    method='post',
+    operation_description="Separate audio into components",
+    request_body=openapi.Schema(
+        type=openapi.TYPE_OBJECT,
+        properties={
+            'audio_file': openapi.Schema(type=openapi.TYPE_STRING, format='binary'),
+        }
+    ),
+    responses={200: 'Separated audio'}
+)
+@api_view(['POST'])
 def separate_audio(request):
     if request.method == 'POST' and request.FILES.get('audio_file'):
         audio_file = request.FILES['audio_file']
@@ -250,6 +291,7 @@ def separate_audio(request):
 
     return JsonResponse({'error': 'Invalid request method or no file provided.'}, status=400)
 
+
 def generate_waveform_image_data(audio_file_path):
     # Load audio file
     y, sr = librosa.load(audio_file_path, sr=None)
@@ -275,6 +317,18 @@ def generate_waveform_image_data(audio_file_path):
     return image_data
     
 @csrf_exempt
+@swagger_auto_schema(
+    method='post',
+    operation_description="Get waveform image from audio file",
+    request_body=openapi.Schema(
+        type=openapi.TYPE_OBJECT,
+        properties={
+            'audio_file': openapi.Schema(type=openapi.TYPE_STRING, format='binary'),
+        }
+    ),
+    responses={200: 'Waveform image'}
+)
+@api_view(['POST'])
 def get_image(request):
     if request.method == 'POST' and request.FILES.get('audio_file'):
         audio_file = request.FILES['audio_file']
