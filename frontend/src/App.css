@@ -16,6 +16,7 @@ header {
   font-size: 24px;
 }
 
+
 input[type="file"],
 button,
 select {
@@ -26,6 +27,12 @@ select {
   margin-right: 10px;
   cursor: pointer;
   border-radius: 20px; /* Round up all the button shapes */
+}
+
+.S9gUrf-YoZ4jf {
+  display: flex;
+  justify-content: center;
+  margin-top: 70px !important;
 }
 
 

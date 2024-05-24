@@ -3,8 +3,13 @@ import './App.css';
 import animation from './animation.gif';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
+import { GoogleLogin } from '@react-oauth/google';
+import { GoogleOAuthProvider } from '@react-oauth/google';
 
 const availableEffects = ['Reverb', 'Pitch Shifter'];
+const responseMessage = "Login successful!";
+const errorMessage = "Login failed!";
+
 
 const App = () => {
   const [instrumentStems, setInstrumentStems] = useState([]);
@@ -20,6 +25,8 @@ const App = () => {
   const [trackPans, setTrackPans] = useState([]); // State to store track pans
   const audioRefs = useRef([]);
   const [instrumentNames, setInstrumentNames] = useState(['Voice', 'Drums', 'Bass', 'Other']);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [token, setToken] = useState(null);
 
   const handleFileChange = (event) => {
     setSelectedFile(event.target.files[0]);
@@ -296,11 +303,24 @@ const handleDragOver = (event) => {
     <div>
       <header>
         <h1>AI Instrument Splitter</h1>
+        {!isLoggedIn && (
+          <GoogleOAuthProvider clientId="114990774632-cq983n39naeea547olvl998p51snb2li.apps.googleusercontent.com">
+            <GoogleLogin 
+              className="google"
+              onSuccess={(token) => {
+              setIsLoggedIn(true);
+              setToken(token);
+              console.log('Token received:', token);
+            }} onError={errorMessage} />
+          </GoogleOAuthProvider>
+        )}
       </header>
+      {isLoggedIn && (
       <div className="input-container" onDrop={handleDrop} onDragOver={handleDragOver}>
         <input type="file" onChange={handleFileChange} />
         <button className="upload-button" onClick={uploadFile}>Upload</button>
       </div>
+      )}
       {loading && ( // Display animation while waiting for response
         <div className="loading-container">
           <img src={animation} alt="Loading Animation" />
