@@ -27,6 +27,8 @@ const App = () => {
   const [instrumentNames, setInstrumentNames] = useState(['Voice', 'Drums', 'Bass', 'Other']);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [token, setToken] = useState(null);
+  const [resetTrigger, setResetTrigger] = useState(false);
+  const fileInputRef = useRef(null);
 
   const handleFileChange = (event) => {
     setSelectedFile(event.target.files[0]);
@@ -293,6 +295,30 @@ const handleDrop = async (event) => {
   }
 };
 
+  const handleNewProject = () => {
+    // Clear all states
+    setInstrumentStems([]);
+    setSelectedFile(null);
+    setWaveformImages([]);
+    setAudioIndexes([]);
+    setIsPlaying(false);
+    setCurrentTime(0);
+    setOriginalStems([]);
+    setSelectedTracks([]);
+    setTrackPans([]);
+    // Ensure all audio players are reset
+    if (audioRefs.current.length > 0) {
+      audioRefs.current.forEach(audio => {
+        audio.pause();
+        audio.currentTime = 0;
+      });
+    }
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''; // Clear the file input
+    }
+    // Trigger a reset in InstrumentTrack components
+    setResetTrigger(true);
+  };
 
 // Step 2: Implement drag over event handler to prevent default behavior
 const handleDragOver = (event) => {
@@ -317,8 +343,9 @@ const handleDragOver = (event) => {
       </header>
       {isLoggedIn && (
       <div className="input-container" onDrop={handleDrop} onDragOver={handleDragOver}>
-        <input type="file" onChange={handleFileChange} />
+        <input type="file" ref={fileInputRef} onChange={handleFileChange} />
         <button className="upload-button" onClick={uploadFile}>Upload</button>
+        <button className="upload-button" onClick={handleNewProject}>New Project</button>
       </div>
       )}
       {loading && ( // Display animation while waiting for response
@@ -333,13 +360,13 @@ const handleDragOver = (event) => {
             <button className="play-button" onClick={togglePlay}>
               {isPlaying ? 'Pause' : 'Play'}
             </button>
-            <progress className="progress-bar" max={audioRefs.current.length > 0 && !isNaN(audioRefs.current[0].duration) ? audioRefs.current[0].duration : 0} value={currentTime} onClick={handleProgressClick}></progress>
+            <progress className="progress-bar" max={audioRefs.current.length > 0 && audioRefs.current[0] && !isNaN(audioRefs.current[0].duration) ? audioRefs.current[0].duration : 0} value={currentTime} onClick={handleProgressClick}></progress>
           </>
         )}
       </div>
       <div className="instrument-stems">
         {instrumentStems.length > 0 && instrumentStems.map((instrument, index) => (
-          <InstrumentTrack key={index} index={index} instrument={instrument} waveformImage={waveformImages[index]} audioRefs={audioRefs} handleMuteToggle={handleMuteToggle} handleSoloToggle={handleSoloToggle} handleEffectAdd={handleEffectAdd} handleEffectAdd2={handleEffectAdd2} updateTrackPan={updateTrackPan} stemName={instrumentNames[index]}/>
+          <InstrumentTrack key={index} index={index} instrument={instrument} waveformImage={waveformImages[index]} audioRefs={audioRefs} handleMuteToggle={handleMuteToggle} handleSoloToggle={handleSoloToggle} handleEffectAdd={handleEffectAdd} handleEffectAdd2={handleEffectAdd2} updateTrackPan={updateTrackPan} stemName={instrumentNames[index]} resetTrigger={resetTrigger} setResetTrigger={setResetTrigger}/>
         ))}
       </div>
       {audioIndexes.map((index) => (
@@ -397,13 +424,25 @@ const handleDragOver = (event) => {
   );
 };
 
-const InstrumentTrack = ({ index, instrument, waveformImage, audioRefs, handleMuteToggle, handleSoloToggle, handleEffectAdd, handleEffectAdd2, updateTrackPan, stemName }) => {
+const InstrumentTrack = ({ index, instrument, waveformImage, audioRefs, handleMuteToggle, handleSoloToggle, handleEffectAdd, handleEffectAdd2, updateTrackPan, stemName, resetTrigger, setResetTrigger  }) => {
   const instrumentNames = ['Voice', 'Drums', 'Bass', 'Other'];
   const { volume, pan, effects } = instrument;
   const [selectedEffects, setSelectedEffects] = useState(effects || []);
   const [currentVolume, setCurrentVolume] = useState(volume || 50);
   const [currentPan, setCurrentPan] = useState(pan || 0);
   const panNode = useRef(null);
+  
+  useEffect(() => {
+    if (resetTrigger) {
+      setSelectedEffects([]);
+      setCurrentVolume(50);
+      setCurrentPan(0);
+      if (panNode.current) {
+        panNode.current.pan.value = 0;
+      }
+      setResetTrigger(false);
+    }
+  }, [resetTrigger]); // This effect runs when resetTrigger changes
 
   useEffect(() => {
     // Call handleVolumeChange function to set initial volume
