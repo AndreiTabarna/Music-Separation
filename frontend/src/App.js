@@ -34,6 +34,9 @@ const App = () => {
   const [selectedEffectsList, setSelectedEffectsList] = useState([]); //new proj
   const [projectName, setProjectName] = useState(''); //new proj
   const [projects, setProjects] = useState([]);
+  const [instrumentVolumes, setInstrumentVolumes] = useState([]);
+  const [instrumentPans, setInstrumentPans] = useState([]);
+
   
 const fetchProjectsByCredential = async () => {
   if (token && token.credential) {
@@ -436,6 +439,54 @@ const handleDeleteProject = async (projectName) => {
   }
 };
 
+const handleLoadProject = async (projectName) => {
+  const credential = token.credential.slice(0, 255);
+  try {
+    const response = await fetch(`http://127.0.0.1:8000/api/get_project_file/?credential=${credential}&project_name=${projectName}`, {
+      method: 'GET',
+    });
+
+    if (response.ok) {
+      const jsonData = await response.json();
+
+      // Initialize variables with values from the loaded project
+      setInstrumentStems(jsonData.instrumentStems);
+      setSelectedFile(jsonData.selectedFile);
+      setWaveformImages(jsonData.waveformImages);
+      setAudioIndexes(jsonData.audioIndexes);
+      setIsPlaying(jsonData.isPlaying);
+      setCurrentTime(jsonData.currentTime);
+      setOriginalStems(jsonData.originalStems);
+      setSelectedTracks(jsonData.selectedTracks);
+      setTrackPans(jsonData.trackPans);
+      setInstrumentNames(jsonData.instrumentNames);
+      setResetTrigger(jsonData.resetTrigger);
+
+      // Extract and set volumes and pans from instruments
+      const volumes = jsonData.instruments.map(instrument => instrument.volume);
+      const pans = jsonData.instruments.map(instrument => instrument.pan);
+      setInstrumentVolumes(volumes);
+      setInstrumentPans(pans);
+
+      console.log('Loaded instrument volumes:', volumes);
+      console.log('Loaded instrument pans:', pans);
+
+      // Initialize variables in InstrumentTrack module
+      audioRefs.current = jsonData.instrumentStems.map(() => React.createRef());
+      setSelectedEffectsList(jsonData.instruments.map(instrument => instrument.effects));
+
+      console.log('Project loaded successfully');
+    } else {
+      console.error('Error loading project file:', response.statusText);
+    }
+  } catch (error) {
+    console.error('Error:', error);
+  }
+};
+
+
+
+
 
 // Step 2: Implement drag over event handler to prevent default behavior
 const handleDragOver = (event) => {
@@ -473,7 +524,7 @@ const handleDragOver = (event) => {
           <ul>
             {projects.map((project, index) => (
               <li key={index} className="project-item">
-                <button>{project}</button>
+                <button onClick={() => handleLoadProject(project)}>{project}</button>
                 <button className="delete-button" onClick={() => handleDeleteProject(project)}>
                   <img src={icon} alt="Delete" />
                 </button>
@@ -501,7 +552,7 @@ const handleDragOver = (event) => {
       </div>
       <div className="instrument-stems">
         {instrumentStems.length > 0 && instrumentStems.map((instrument, index) => (
-          <InstrumentTrack key={index} index={index} instrument={instrument} waveformImage={waveformImages[index]} audioRefs={audioRefs} handleMuteToggle={handleMuteToggle} handleSoloToggle={handleSoloToggle} handleEffectAdd={handleEffectAdd} handleEffectAdd2={handleEffectAdd2} updateTrackPan={updateTrackPan} stemName={instrumentNames[index]} resetTrigger={resetTrigger} setResetTrigger={setResetTrigger} updateSelectedEffects={updateSelectedEffects}/>
+          <InstrumentTrack key={index} index={index} instrument={instrument} waveformImage={waveformImages[index]} audioRefs={audioRefs} handleMuteToggle={handleMuteToggle} handleSoloToggle={handleSoloToggle} handleEffectAdd={handleEffectAdd} handleEffectAdd2={handleEffectAdd2} updateTrackPan={updateTrackPan} stemName={instrumentNames[index]} resetTrigger={resetTrigger} setResetTrigger={setResetTrigger} updateSelectedEffects={updateSelectedEffects} loadedVolume={instrumentVolumes[index]} loadedPan={instrumentPans[index]}/>
         ))}
       </div>
       {audioIndexes.map((index) => (
@@ -559,7 +610,7 @@ const handleDragOver = (event) => {
   );
 };
 
-const InstrumentTrack = ({ index, instrument, waveformImage, audioRefs, handleMuteToggle, handleSoloToggle, handleEffectAdd, handleEffectAdd2, updateTrackPan, stemName, resetTrigger, setResetTrigger, updateSelectedEffects }) => {
+const InstrumentTrack = ({ index, instrument, waveformImage, audioRefs, handleMuteToggle, handleSoloToggle, handleEffectAdd, handleEffectAdd2, updateTrackPan, stemName, resetTrigger, setResetTrigger, updateSelectedEffects, loadedVolume, loadedPan }) => {
   const { volume, pan, effects } = instrument;
   const [selectedEffects, setSelectedEffects] = useState(effects || []);
   const [currentVolume, setCurrentVolume] = useState(volume || 50);
@@ -595,6 +646,18 @@ const InstrumentTrack = ({ index, instrument, waveformImage, audioRefs, handleMu
   useEffect(() => {
     updateSelectedEffects(index, selectedEffects);
   }, [selectedEffects]);
+  
+useEffect(() => {
+    const updateVolumeAndPan = () => {
+        if (loadedVolume !== undefined && loadedPan !== undefined) {
+            handleVolumeChange2(loadedVolume);
+            handlePanChange2(loadedPan);
+        }
+    };
+
+    updateVolumeAndPan(); // Initial check
+}, []); // Empty dependency array to run after all other useEffects
+
 
   const initializeVolume = (newVolume) => {
     setCurrentVolume(newVolume);
@@ -622,6 +685,24 @@ const InstrumentTrack = ({ index, instrument, waveformImage, audioRefs, handleMu
       updateTrackPan(index, newPan);
     }
   };
+  
+  const handleVolumeChange2 = (loadedVolume) => {
+    setCurrentVolume(loadedVolume);
+    const audioRef = audioRefs.current[index];
+    if (audioRef) {
+      audioRef.volume = loadedVolume / 100;
+    }
+  };
+
+  const handlePanChange2 = (loadedPan) => {
+    setCurrentPan(loadedPan);
+    if (panNode.current) {
+      const normalizedPan = loadedPan / 100;
+      panNode.current.pan.value = normalizedPan;
+      updateTrackPan(index, loadedPan);
+    }
+  };
+
 
   const handleAddEffect = (selectedEffect) => {
     if (!selectedEffects.includes(selectedEffect)) {
