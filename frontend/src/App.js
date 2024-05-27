@@ -465,15 +465,17 @@ const handleLoadProject = async (projectName) => {
       // Extract and set volumes and pans from instruments
       const volumes = jsonData.instruments.map(instrument => instrument.volume);
       const pans = jsonData.instruments.map(instrument => instrument.pan);
+      const effects = jsonData.instruments.map(instrument => instrument.effects);
       setInstrumentVolumes(volumes);
       setInstrumentPans(pans);
+      setSelectedEffectsList(effects);
 
       console.log('Loaded instrument volumes:', volumes);
       console.log('Loaded instrument pans:', pans);
+      console.log('Loaded instrument effects:', effects);
 
       // Initialize variables in InstrumentTrack module
       audioRefs.current = jsonData.instrumentStems.map(() => React.createRef());
-      setSelectedEffectsList(jsonData.instruments.map(instrument => instrument.effects));
 
       console.log('Project loaded successfully');
     } else {
@@ -552,7 +554,7 @@ const handleDragOver = (event) => {
       </div>
       <div className="instrument-stems">
         {instrumentStems.length > 0 && instrumentStems.map((instrument, index) => (
-          <InstrumentTrack key={index} index={index} instrument={instrument} waveformImage={waveformImages[index]} audioRefs={audioRefs} handleMuteToggle={handleMuteToggle} handleSoloToggle={handleSoloToggle} handleEffectAdd={handleEffectAdd} handleEffectAdd2={handleEffectAdd2} updateTrackPan={updateTrackPan} stemName={instrumentNames[index]} resetTrigger={resetTrigger} setResetTrigger={setResetTrigger} updateSelectedEffects={updateSelectedEffects} loadedVolume={instrumentVolumes[index]} loadedPan={instrumentPans[index]}/>
+          <InstrumentTrack key={index} index={index} instrument={instrument} waveformImage={waveformImages[index]} audioRefs={audioRefs} handleMuteToggle={handleMuteToggle} handleSoloToggle={handleSoloToggle} handleEffectAdd={handleEffectAdd} handleEffectAdd2={handleEffectAdd2} updateTrackPan={updateTrackPan} stemName={instrumentNames[index]} resetTrigger={resetTrigger} setResetTrigger={setResetTrigger} updateSelectedEffects={updateSelectedEffects} loadedVolume={instrumentVolumes[index]} loadedPan={instrumentPans[index]} loadedEffects={selectedEffectsList[index]}/>
         ))}
       </div>
       {audioIndexes.map((index) => (
@@ -610,7 +612,7 @@ const handleDragOver = (event) => {
   );
 };
 
-const InstrumentTrack = ({ index, instrument, waveformImage, audioRefs, handleMuteToggle, handleSoloToggle, handleEffectAdd, handleEffectAdd2, updateTrackPan, stemName, resetTrigger, setResetTrigger, updateSelectedEffects, loadedVolume, loadedPan }) => {
+const InstrumentTrack = ({ index, instrument, waveformImage, audioRefs, handleMuteToggle, handleSoloToggle, handleEffectAdd, handleEffectAdd2, updateTrackPan, stemName, resetTrigger, setResetTrigger, updateSelectedEffects, loadedVolume, loadedPan, loadedEffects }) => {
   const { volume, pan, effects } = instrument;
   const [selectedEffects, setSelectedEffects] = useState(effects || []);
   const [currentVolume, setCurrentVolume] = useState(volume || 50);
@@ -652,6 +654,7 @@ useEffect(() => {
         if (loadedVolume !== undefined && loadedPan !== undefined) {
             handleVolumeChange2(loadedVolume);
             handlePanChange2(loadedPan);
+            setSelectedEffects(loadedEffects);
         }
     };
 
