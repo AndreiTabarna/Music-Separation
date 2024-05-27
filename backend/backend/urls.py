@@ -44,6 +44,7 @@ urlpatterns = [
     path('api/upload_and_add_project/', upload_and_add_project, name='upload_and_add_project'),
     path('api/delete_project/', delete_project, name='delete_project'),
     path('api/get_projects_by_credential/', get_projects_by_credential, name='get_projects_by_credential'),
+    path('api/get_project_file/', get_project_file, name='get_project_file'),
 ]
 
 

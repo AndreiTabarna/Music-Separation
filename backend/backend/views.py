@@ -1,4 +1,4 @@
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
@@ -410,4 +410,26 @@ def get_projects_by_credential(request):
 
     projects = Project.objects.filter(credential=credential).values_list('project_name', flat=True)
     return JsonResponse(list(projects), safe=False)
+
+@csrf_exempt    
+def get_project_file(request):
+    credential = request.GET.get('credential')
+    project_name = request.GET.get('project_name')
+    if not credential or not project_name:
+        return JsonResponse({'error': 'Missing required parameters'}, status=400)
+
+    try:
+        project = Project.objects.get(credential=credential, project_name=project_name)
+        
+        # Access the file from the storage
+        file_path = project.project_path
+        if default_storage.exists(file_path):
+            with default_storage.open(file_path, 'rb') as file:
+                response = HttpResponse(file.read(), content_type='application/octet-stream')
+                response['Content-Disposition'] = f'attachment; filename={file_path.split("/")[-1]}'
+                return response
+        else:
+            return JsonResponse({'error': 'File not found in storage'}, status=404)
+    except Project.DoesNotExist:
+        return JsonResponse({'error': 'Project not found'}, status=404)
 
