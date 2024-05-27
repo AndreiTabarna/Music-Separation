@@ -41,6 +41,9 @@ urlpatterns = [
     path('api/process_audio_with_effects/', process_audio_with_effects, name='process_audio_with_effects'),
     path('api/create_export/', create_export, name='create_export'),
     path('api/get_image/', get_image, name='get_image'),
+    path('api/upload_and_add_project/', upload_and_add_project, name='upload_and_add_project'),
+    path('api/delete_project/', delete_project, name='delete_project'),
+    path('api/get_projects_by_credential/', get_projects_by_credential, name='get_projects_by_credential'),
 ]
 
 

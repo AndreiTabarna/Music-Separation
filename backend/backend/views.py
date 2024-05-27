@@ -1,5 +1,7 @@
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
+from django.core.files.storage import default_storage
+from django.core.files.base import ContentFile
 import soundfile as sf
 import matplotlib.pyplot as plt
 import librosa.display
@@ -20,6 +22,8 @@ from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
+from .models import Project
+import json
 
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 MAX_MIXTURES = int(1e8)
@@ -347,4 +351,63 @@ def get_image(request):
         return JsonResponse({'waveform_image': waveform_image_data})
 
     return JsonResponse({'error': 'Invalid request method or no file provided.'}, status=400)
+ 
+@csrf_exempt   
+def upload_and_add_project(request):
+    if request.method == 'POST':
+        credential = request.POST.get('credential')
+        project_name = request.POST.get('project_name')
+        
+        if 'file' not in request.FILES:
+            return JsonResponse({'error': 'No file provided.'}, status=400)
+        
+        file = request.FILES['file']
+        
+        if not credential or not project_name:
+            return JsonResponse({'error': 'Missing required fields'}, status=400)
+        
+        # Upload file to GCS
+        path = default_storage.save(f'uploads/{file.name}', ContentFile(file.read()))
+        
+        # Add project to database with the path of the uploaded file
+        project = Project(credential=credential, project_name=project_name, project_path=path)
+        project.save()
+        
+        return JsonResponse({'message': 'Project added successfully', 'project_id': project.id})
+    
+    return JsonResponse({'error': 'Invalid request'}, status=400)
+
+@csrf_exempt    
+def delete_project(request):
+    if request.method == 'DELETE':
+        try:
+            body = json.loads(request.body)
+            credential = body.get('credential')
+            project_name = body.get('project_name')
+            if not credential or not project_name:
+                return JsonResponse({'error': 'Missing required fields'}, status=400)
+
+            project = Project.objects.get(credential=credential, project_name=project_name)
+            
+            # Delete the file from the Google Cloud Storage bucket
+            file_path = project.project_path
+            default_storage.delete(file_path)
+
+            # Delete the project from the database
+            project.delete()
+            return JsonResponse({'message': 'Project and file deleted successfully'})
+        except Project.DoesNotExist:
+            return JsonResponse({'error': 'Project not found'}, status=404)
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'Invalid JSON'}, status=400)
+    return JsonResponse({'error': 'Invalid request'}, status=400)
+ 
+@csrf_exempt    
+def get_projects_by_credential(request):
+    credential = request.GET.get('credential')
+    if not credential:
+        return JsonResponse({'error': 'Missing credential parameter'}, status=400)
+
+    projects = Project.objects.filter(credential=credential).values_list('project_name', flat=True)
+    return JsonResponse(list(projects), safe=False)
 
