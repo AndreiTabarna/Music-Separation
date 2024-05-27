@@ -1,10 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
 import './App.css';
 import animation from './animation.gif';
+import icon from './delete.png';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import { GoogleLogin } from '@react-oauth/google';
 import { GoogleOAuthProvider } from '@react-oauth/google';
+import projectNameGenerator from 'project-name-generator';
 
 const availableEffects = ['Reverb', 'Pitch Shifter'];
 const responseMessage = "Login successful!";
@@ -29,6 +31,45 @@ const App = () => {
   const [token, setToken] = useState(null);
   const [resetTrigger, setResetTrigger] = useState(false);
   const fileInputRef = useRef(null);
+  const [selectedEffectsList, setSelectedEffectsList] = useState([]); //new proj
+  const [projectName, setProjectName] = useState(''); //new proj
+  const [projects, setProjects] = useState([]);
+  
+const fetchProjectsByCredential = async () => {
+  if (token && token.credential) {
+    try {
+      const credential = token.credential.slice(0, 255);
+      const response = await fetch(`http://127.0.0.1:8000/api/get_projects_by_credential/?credential=${credential}`, {
+        method: 'GET'
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setProjects(data);
+        console.log("Project names fetched!");
+      } else {
+        console.error('Error fetching projects:', response.statusText);
+      }
+    } catch (error) {
+      console.error('Error:', error);
+    }
+  }
+};
+
+// Fetch projects when the component mounts or when the token changes
+useEffect(() => {
+  fetchProjectsByCredential();
+}, [token]);
+
+
+  const updateSelectedEffects = (index, effects) => {
+    const newEffectsList = [...selectedEffectsList];
+    newEffectsList[index] = effects;
+    setSelectedEffectsList(newEffectsList);
+  };
+  
+  const generateRandomDashedProjectName = () => {
+    return projectNameGenerator().dashed;
+  };
 
   const handleFileChange = (event) => {
     setSelectedFile(event.target.files[0]);
@@ -48,6 +89,12 @@ const App = () => {
         const data = await response.json();
         console.log('Separated files:', data.separated_files);
         console.log('Waveform images:', data.waveform_images);
+        
+
+        const newProjectName = generateRandomDashedProjectName();
+        setProjectName(newProjectName);
+        console.log('Generated Project Name:', newProjectName);
+        
         setInstrumentStems(data.separated_files);
         setOriginalStems([...data.separated_files]);
         setWaveformImages(data.waveform_images);
@@ -232,11 +279,6 @@ const handleExport = async () => {
   handleExportPopupClose();
 };
 
-
-
-
-
-
   const handleTrackSelection = (index) => {
     if (selectedTracks.includes(index)) {
       setSelectedTracks(selectedTracks.filter((trackIndex) => trackIndex !== index));
@@ -306,6 +348,8 @@ const handleDrop = async (event) => {
     setOriginalStems([]);
     setSelectedTracks([]);
     setTrackPans([]);
+    setSelectedEffectsList([]);
+    setProjects([]);
     // Ensure all audio players are reset
     if (audioRefs.current.length > 0) {
       audioRefs.current.forEach(audio => {
@@ -319,6 +363,79 @@ const handleDrop = async (event) => {
     // Trigger a reset in InstrumentTrack components
     setResetTrigger(true);
   };
+  
+
+const handleSaveProject = async () => {
+  const projectData = {
+    instrumentStems,
+    selectedFile,
+    waveformImages,
+    audioIndexes,
+    isPlaying,
+    currentTime,
+    originalStems,
+    selectedTracks,
+    trackPans,
+    instrumentNames,
+    resetTrigger,
+    instruments: []
+  };
+
+  instrumentStems.forEach((_, index) => {
+    const audioRef = audioRefs.current[index];
+    const instrument = {
+      name: instrumentNames[index],
+      volume: audioRef ? audioRef.volume * 100 : 50,
+      pan: trackPans[index],
+      effects: selectedEffectsList[index] || []
+    };
+    projectData.instruments.push(instrument);
+  });
+
+  const jsonString = JSON.stringify(projectData, null, 2);
+  const blob = new Blob([jsonString], { type: 'application/json' });
+  const renamedFile = new File([blob], `${projectName}.json`, { type: 'application/json' });
+
+  const formData = new FormData();
+  formData.append('credential', token.credential.slice(0, 255));
+  formData.append('project_name', projectName);
+  formData.append('file', renamedFile);
+
+  try {
+    const response = await fetch('http://127.0.0.1:8000/api/upload_and_add_project/', {
+      method: 'POST',
+      body: formData
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      console.log('Project saved and uploaded:', data);
+    } else {
+      console.error('Error:', response.statusText);
+    }
+  } catch (error) {
+    console.error('Error:', error);
+  }
+};
+
+const handleDeleteProject = async (projectName) => {
+  const credential = token.credential.slice(0, 255);
+  const response = await fetch('http://127.0.0.1:8000/api/delete_project/', {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ credential, project_name: projectName })
+  });
+
+  if (response.ok) {
+    setProjects((prevProjects) => prevProjects.filter((project) => project !== projectName));
+    console.log('Project deleted successfully');
+  } else {
+    console.error('Error deleting project:', response.statusText);
+  }
+};
+
 
 // Step 2: Implement drag over event handler to prevent default behavior
 const handleDragOver = (event) => {
@@ -346,8 +463,26 @@ const handleDragOver = (event) => {
         <input type="file" ref={fileInputRef} onChange={handleFileChange} />
         <button className="upload-button" onClick={uploadFile}>Upload</button>
         <button className="upload-button" onClick={handleNewProject}>New Project</button>
+        <button className="upload-button" onClick={handleSaveProject}>Save Project</button>
       </div>
       )}
+      
+      {isLoggedIn && (
+        <div className="projects-list">
+          <h2>Projects</h2>
+          <ul>
+            {projects.map((project, index) => (
+              <li key={index} className="project-item">
+                <button>{project}</button>
+                <button className="delete-button" onClick={() => handleDeleteProject(project)}>
+                  <img src={icon} alt="Delete" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {loading && ( // Display animation while waiting for response
         <div className="loading-container">
           <img src={animation} alt="Loading Animation" />
@@ -366,7 +501,7 @@ const handleDragOver = (event) => {
       </div>
       <div className="instrument-stems">
         {instrumentStems.length > 0 && instrumentStems.map((instrument, index) => (
-          <InstrumentTrack key={index} index={index} instrument={instrument} waveformImage={waveformImages[index]} audioRefs={audioRefs} handleMuteToggle={handleMuteToggle} handleSoloToggle={handleSoloToggle} handleEffectAdd={handleEffectAdd} handleEffectAdd2={handleEffectAdd2} updateTrackPan={updateTrackPan} stemName={instrumentNames[index]} resetTrigger={resetTrigger} setResetTrigger={setResetTrigger}/>
+          <InstrumentTrack key={index} index={index} instrument={instrument} waveformImage={waveformImages[index]} audioRefs={audioRefs} handleMuteToggle={handleMuteToggle} handleSoloToggle={handleSoloToggle} handleEffectAdd={handleEffectAdd} handleEffectAdd2={handleEffectAdd2} updateTrackPan={updateTrackPan} stemName={instrumentNames[index]} resetTrigger={resetTrigger} setResetTrigger={setResetTrigger} updateSelectedEffects={updateSelectedEffects}/>
         ))}
       </div>
       {audioIndexes.map((index) => (
@@ -424,8 +559,7 @@ const handleDragOver = (event) => {
   );
 };
 
-const InstrumentTrack = ({ index, instrument, waveformImage, audioRefs, handleMuteToggle, handleSoloToggle, handleEffectAdd, handleEffectAdd2, updateTrackPan, stemName, resetTrigger, setResetTrigger  }) => {
-  const instrumentNames = ['Voice', 'Drums', 'Bass', 'Other'];
+const InstrumentTrack = ({ index, instrument, waveformImage, audioRefs, handleMuteToggle, handleSoloToggle, handleEffectAdd, handleEffectAdd2, updateTrackPan, stemName, resetTrigger, setResetTrigger, updateSelectedEffects }) => {
   const { volume, pan, effects } = instrument;
   const [selectedEffects, setSelectedEffects] = useState(effects || []);
   const [currentVolume, setCurrentVolume] = useState(volume || 50);
@@ -442,17 +576,15 @@ const InstrumentTrack = ({ index, instrument, waveformImage, audioRefs, handleMu
       }
       setResetTrigger(false);
     }
-  }, [resetTrigger]); // This effect runs when resetTrigger changes
+  }, [resetTrigger]);
 
   useEffect(() => {
-    // Call handleVolumeChange function to set initial volume
     initializeVolume(50);
-  }, []); // Empty dependency array ensures that this effect runs only once, similar to componentDidMount
+  }, []);
 
   useEffect(() => {
     const audioRef = audioRefs.current[index];
     if (audioRef && !panNode.current) {
-      // Create a StereoPannerNode for panning
       const audioContext = new AudioContext();
       panNode.current = audioContext.createStereoPanner();
       const source = audioContext.createMediaElementSource(audioRef);
@@ -460,11 +592,15 @@ const InstrumentTrack = ({ index, instrument, waveformImage, audioRefs, handleMu
     }
   }, [audioRefs, index]);
 
+  useEffect(() => {
+    updateSelectedEffects(index, selectedEffects);
+  }, [selectedEffects]);
+
   const initializeVolume = (newVolume) => {
     setCurrentVolume(newVolume);
     const audioRef = audioRefs.current[index];
     if (audioRef) {
-      audioRef.volume = newVolume / 100; // Normalize the volume to a range of 0 to 1
+      audioRef.volume = newVolume / 100;
     }
   };
 
@@ -473,7 +609,7 @@ const InstrumentTrack = ({ index, instrument, waveformImage, audioRefs, handleMu
     setCurrentVolume(newVolume);
     const audioRef = audioRefs.current[index];
     if (audioRef) {
-      audioRef.volume = newVolume / 100; // Normalize the volume to a range of 0 to 1
+      audioRef.volume = newVolume / 100;
     }
   };
 
@@ -483,26 +619,27 @@ const InstrumentTrack = ({ index, instrument, waveformImage, audioRefs, handleMu
     if (panNode.current) {
       const normalizedPan = newPan / 100;
       panNode.current.pan.value = normalizedPan;
-      updateTrackPan(index, newPan); // Update the track pan in the parent component
+      updateTrackPan(index, newPan);
     }
   };
 
   const handleAddEffect = (selectedEffect) => {
     if (!selectedEffects.includes(selectedEffect)) {
-      setSelectedEffects([...selectedEffects, selectedEffect]);
-      handleEffectAdd(index, selectedEffect); // Call handleEffectAdd to add the effect
+      const newEffects = [...selectedEffects, selectedEffect];
+      setSelectedEffects(newEffects);
+      handleEffectAdd(index, selectedEffect);
     }
   };
 
   const handleRemoveEffect = (effectToRemove) => {
-    setSelectedEffects(selectedEffects.filter((effect) => effect !== effectToRemove));
-    // Pass the updated list of effects to handleEffectAdd2
-    handleEffectAdd2(index, selectedEffects.filter((effect) => effect !== effectToRemove));
+    const newEffects = selectedEffects.filter((effect) => effect !== effectToRemove);
+    setSelectedEffects(newEffects);
+    handleEffectAdd2(index, newEffects);
   };
 
   return (
     <div className="instrument-track">
-      <h3>{stemName}</h3> {/* Display the instrument name based on index */}
+      <h3>{stemName}</h3>
       <div className="instrument-track-settings">
         <div>
           Volume: <span>{currentVolume}</span>
@@ -522,8 +659,8 @@ const InstrumentTrack = ({ index, instrument, waveformImage, audioRefs, handleMu
           Effects:
           <ul className="effects-list">
             {selectedEffects &&
-              selectedEffects.map((effect, index) => (
-                <li key={index}>
+              selectedEffects.map((effect, i) => (
+                <li key={i}>
                   {effect}
                   <button onClick={() => handleRemoveEffect(effect)}>Remove</button>
                 </li>
@@ -532,8 +669,8 @@ const InstrumentTrack = ({ index, instrument, waveformImage, audioRefs, handleMu
           <span>Add Effect:</span>
           <select onChange={(event) => handleAddEffect(event.target.value)}>
             <option value="">Select Effect</option>
-            {availableEffects.map((effect, index) => (
-              <option key={index} value={effect}>
+            {availableEffects.map((effect, i) => (
+              <option key={i} value={effect}>
                 {effect}
               </option>
             ))}
@@ -548,6 +685,7 @@ const InstrumentTrack = ({ index, instrument, waveformImage, audioRefs, handleMu
     </div>
   );
 };
+
 
 export default App;
 

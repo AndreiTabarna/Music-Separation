@@ -254,4 +254,76 @@ select {
   font-size: 24px;
 }
 
+.projects-list {
+  position: fixed;
+  left: 20px;
+  top: 150px;
+  width: 170px;
+  background-color: #333;
+  padding: 10px;
+  border-radius: 10px;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+}
+
+.projects-list h2 {
+  text-align: center;
+  margin-bottom: 10px;
+}
+
+.projects-list ul {
+  list-style-type: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center; /* Center the list items */
+}
+
+.projects-list li {
+  margin-bottom: 10px;
+  width: 100%; /* Ensure list items take full width for centering */
+}
+
+.projects-list button {
+  width: 100%;
+  background-color: #444;
+  color: #fff;
+  border: none;
+  padding: 10px;
+  border-radius: 5px;
+  cursor: pointer;
+  margin: 0 auto; /* Center the button */
+  border-radius: 20px;
+}
+
+.projects-list button:hover {
+  background-color: #666;
+}
+
+.project-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.delete-button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  margin-left: 6px !important;
+  width: 35px !important; /* Set width and height to make it circular */
+  height: 35px !important;
+  border-radius: 50% !important; /* Make the button circular */
+  display: flex;
+  justify-content: center !important;
+  align-items: center !important;
+  background-color: #f44336; /* Optional: Add a background color for visibility */
+}
+
+.delete-button img {
+  height: 20px;
+  width: 15px;
+}
+
+
 
