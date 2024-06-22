@@ -90,3 +90,4 @@ class MaskInference(nn.Module):
 
         return nussl.ml.SeparationModel(config)
 
+nussl.ml.register_module(MaskInference)
