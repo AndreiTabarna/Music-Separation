@@ -2,7 +2,6 @@ import React, { useState, useRef, useEffect } from 'react';
 import './App.css';
 import animation from './animation.gif';
 import icon from './delete.png';
-import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import { GoogleLogin } from '@react-oauth/google';
 import { GoogleOAuthProvider } from '@react-oauth/google';
@@ -31,8 +30,8 @@ const App = () => {
   const [token, setToken] = useState(null);
   const [resetTrigger, setResetTrigger] = useState(false);
   const fileInputRef = useRef(null);
-  const [selectedEffectsList, setSelectedEffectsList] = useState([]); //new proj
-  const [projectName, setProjectName] = useState(''); //new proj
+  const [selectedEffectsList, setSelectedEffectsList] = useState([]); 
+  const [projectName, setProjectName] = useState(''); 
   const [projects, setProjects] = useState([]);
   const [instrumentVolumes, setInstrumentVolumes] = useState([]);
   const [instrumentPans, setInstrumentPans] = useState([]);
@@ -490,7 +489,6 @@ const handleLoadProject = async (projectName) => {
 
 
 
-// Step 2: Implement drag over event handler to prevent default behavior
 const handleDragOver = (event) => {
   event.preventDefault();
 };
@@ -554,7 +552,23 @@ const handleDragOver = (event) => {
       </div>
       <div className="instrument-stems">
         {instrumentStems.length > 0 && instrumentStems.map((instrument, index) => (
-          <InstrumentTrack key={index} index={index} instrument={instrument} waveformImage={waveformImages[index]} audioRefs={audioRefs} handleMuteToggle={handleMuteToggle} handleSoloToggle={handleSoloToggle} handleEffectAdd={handleEffectAdd} handleEffectAdd2={handleEffectAdd2} updateTrackPan={updateTrackPan} stemName={instrumentNames[index]} resetTrigger={resetTrigger} setResetTrigger={setResetTrigger} updateSelectedEffects={updateSelectedEffects} loadedVolume={instrumentVolumes[index]} loadedPan={instrumentPans[index]} loadedEffects={selectedEffectsList[index]}/>
+          <InstrumentTrack key={index} 
+          index={index} 
+          instrument={instrument} 
+          waveformImage={waveformImages[index]} 
+          audioRefs={audioRefs} 
+          handleMuteToggle={handleMuteToggle} 
+          handleSoloToggle={handleSoloToggle} 
+          handleEffectAdd={handleEffectAdd} 
+          handleEffectAdd2={handleEffectAdd2} 
+          updateTrackPan={updateTrackPan} 
+          stemName={instrumentNames[index]} 
+          resetTrigger={resetTrigger} 
+          setResetTrigger={setResetTrigger} 
+          updateSelectedEffects={updateSelectedEffects} 
+          loadedVolume={instrumentVolumes[index]} 
+          loadedPan={instrumentPans[index]} 
+          loadedEffects={selectedEffectsList[index]}/>
         ))}
       </div>
       {audioIndexes.map((index) => (
