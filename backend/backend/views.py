@@ -1,29 +1,31 @@
-from django.http import JsonResponse, HttpResponse
-from django.views.decorators.csrf import csrf_exempt
-from django.core.files.storage import default_storage
-from django.core.files.base import ContentFile
 import soundfile as sf
 import matplotlib.pyplot as plt
 import librosa.display
 import numpy as np
 import io as io1
 import base64
-from common.models import MaskInference
-from nussl.separation.deep import DeepMaskEstimation
 import torch
 import nussl
 import shutil
+import os
+import json
+import zipfile
+import secrets
+
+from django.http import JsonResponse, HttpResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.core.files.storage import default_storage
+from django.core.files.base import ContentFile
+from requirements.models import MaskInference
+from nussl.separation.deep import DeepMaskEstimation
 from pedalboard import *
 from pedalboard.io import AudioFile
-import os
-import zipfile
 from pydub import AudioSegment
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from .models import Project
-import json
 
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 MAX_MIXTURES = int(1e8)
@@ -57,8 +59,10 @@ def create_export(request):
         if len(audio_files) != len(volumes) or len(audio_files) != len(pans):
             return JsonResponse({'error': 'Mismatch in the number of audio files, volume values, and panning values.'}, status=400)
 
+
+        random_number = secrets.token_hex(4)
         # Temporary directory to store processed audio files
-        temp_dir = 'temp_audio'
+        temp_dir = 'temp_audio_{random_number}'
         os.makedirs(temp_dir, exist_ok=True)
 
         processed_audio_files = []
@@ -81,7 +85,7 @@ def create_export(request):
             audio = audio + volume
 
             # Save processed audio
-            processed_audio_path = os.path.join(temp_dir, f'processed_{audio_file.name}')
+            processed_audio_path = os.path.join(temp_dir, f'processed_{audio_file.name}_{random_number}')
             audio.export(processed_audio_path, format='wav')
 
             processed_audio_files.append(processed_audio_path)
@@ -96,15 +100,15 @@ def create_export(request):
                 final_audio = final_audio.overlay(audio, position=0)
 
         # Export the final project as a WAV file
-        final_project_path = os.path.join(temp_dir, 'final_project.wav')
+        final_project_path = os.path.join(temp_dir, 'final_project_{random_number}.wav')
         final_audio.export(final_project_path, format='wav')
 
         # Create a zip archive of processed audio files
-        zip_filename = 'processed_audio.zip'
+        zip_filename = 'processed_audio_{random_number}.zip'
         with zipfile.ZipFile(zip_filename, 'w') as zip_file:
             for processed_audio_path in processed_audio_files:
                 zip_file.write(processed_audio_path, arcname=os.path.basename(processed_audio_path))
-            zip_file.write(final_project_path, arcname='final_project.wav')
+            zip_file.write(final_project_path, arcname='final_project_{random_number}.wav')
 
         # Encode the zip archive as Base64
         with open(zip_filename, 'rb') as zip_file:
@@ -112,6 +116,11 @@ def create_export(request):
 
         # Remove temporary directory
         shutil.rmtree(temp_dir)
+        os.remove(zip_filename)
+        
+        for processed_audio_path in processed_audio_files:
+            if os.path.exists(processed_audio_path):
+                os.remove(processed_audio_path)
 
         return JsonResponse({'processed_audio_zip': zip_base64})
 
@@ -136,9 +145,11 @@ def process_audio_with_effects(request):
     if request.method == 'POST' and request.FILES.get('audio_file'):
         audio_file = request.FILES['audio_file']
         effect_names = request.POST.getlist('effects')
+        
+        random_number = secrets.token_hex(4)
 
         # Save the uploaded file
-        with open('uploaded_audio.wav', 'wb') as f:
+        with open('uploaded_audio_{random_number}.wav', 'wb') as f:
             for chunk in audio_file.chunks():
                 f.write(chunk)
 
@@ -162,19 +173,19 @@ def process_audio_with_effects(request):
         board = Pedalboard(effects)
 
         samplerate = 44100.0
-        with AudioFile('uploaded_audio.wav').resampled_to(samplerate) as f:
+        with AudioFile('uploaded_audio_{random_number}.wav').resampled_to(samplerate) as f:
             audio = f.read(f.frames)
         effected = board(audio, samplerate)
-        with AudioFile('processed_audio.wav', 'w', samplerate, effected.shape[0]) as f:
+        with AudioFile('processed_audio_{random_number}.wav', 'w', samplerate, effected.shape[0]) as f:
             f.write(effected)
 
         # Read the processed audio file as bytes
-        with open('processed_audio.wav', 'rb') as f:
+        with open('processed_audio_{random_number}.wav', 'rb') as f:
             audio_bytes = f.read()
 
         # Remove the temporary uploaded audio file and the processed audio file
-        os.remove('uploaded_audio.wav')
-        #os.remove('processed_audio.wav')
+        os.remove('uploaded_audio_{random_number}.wav')
+        os.remove('processed_audio_{random_number}.wav')
 
         # Encode the processed audio as Base64
         audio_base64 = base64.b64encode(audio_bytes).decode('utf-8')
@@ -200,9 +211,11 @@ def process_audio_with_effects(request):
 def separate_audio(request):
     if request.method == 'POST' and request.FILES.get('audio_file'):
         audio_file = request.FILES['audio_file']
+        
+        random_number = secrets.token_hex(4)
 
         # Save the uploaded file
-        with open('uploaded_audio.wav', 'wb') as f:
+        with open('uploaded_audio_{random_number}.wav', 'wb') as f:
             for chunk in audio_file.chunks():
                 f.write(chunk)
 
@@ -213,11 +226,11 @@ def separate_audio(request):
         all_waveform_images = []
 
         # Resample the uploaded audio to 44100 Hz
-        y, sr = librosa.load('uploaded_audio.wav', sr=44100)
-        sf.write('uploaded_audio_resampled.wav', y, sr)
+        y, sr = librosa.load('uploaded_audio_{random_number}.wav', sr=44100)
+        sf.write('uploaded_audio_resampled_{random_number}.wav', y, sr)
 
         # Load the original audio file
-        original_audio_signal = nussl.AudioSignal('uploaded_audio_resampled.wav')
+        original_audio_signal = nussl.AudioSignal('uploaded_audio_resampled_{random_number}.wav')
         original_signal_copy = original_audio_signal
 
         for model_path in model_paths:
@@ -246,7 +259,7 @@ def separate_audio(request):
             output_files = []
             waveform_images = []  # List to store waveform image data
             for i, estimate in enumerate(estimates):
-                output_file = f'estimated_source_{i}_{os.path.basename(model_path)}.wav'
+                output_file = f'estimated_source_{i}_{os.path.basename(model_path)}_{random_number}.wav'
                 estimate.write_audio_to_file(output_file)
                 output_files.append(output_file)
 
@@ -286,6 +299,9 @@ def separate_audio(request):
         
         all_waveform_images.append(waveform_images)
         all_wav_data.append(wav_data)
+        
+        os.remove('uploaded_audio_{random_number}.wav')
+        os.remove('uploaded_audio_resampled_{random_number}.wav')        
         
 
         return JsonResponse({
@@ -338,15 +354,16 @@ def get_image(request):
         audio_file = request.FILES['audio_file']
 
         # Save the uploaded file
-        with open('uploaded_audio.wav', 'wb') as f:
+        random_number = secrets.token_hex(4)
+        with open('uploaded_audio_{random_number}.wav', 'wb') as f:
             for chunk in audio_file.chunks():
                 f.write(chunk)
 
         # Generate waveform image data
-        waveform_image_data = generate_waveform_image_data('uploaded_audio.wav')
+        waveform_image_data = generate_waveform_image_data('uploaded_audio_{random_number}.wav')
 
         # Remove the temporary uploaded audio file
-        os.remove('uploaded_audio.wav')
+        os.remove('uploaded_audio_{random_number}.wav')
 
         return JsonResponse({'waveform_image': waveform_image_data})
 
