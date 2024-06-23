@@ -158,8 +158,13 @@ def process_audio_with_effects(request):
         available_effects = {
             'pitch shifter': PitchShift(semitones=12),
             'reverb': Reverb(room_size=0.75),
-            # Add more effects as needed
+            'chorus': Chorus(rate_hz=2.0, depth=0.9, centre_delay_ms=7.0, feedback=0.5, mix=0.5),
+            'compressor': Compressor(threshold_db=-20.0, ratio=3.0, attack_ms=5.0, release_ms=50.0),
+            'distortion': Distortion(drive_db=30.0),
+            'delay': Delay(delay_seconds=0.4, mix=0.5),
+            'phaser': Phaser(rate_hz=0.5, depth=0.7, centre_frequency_hz=800.0, feedback=0.7, mix=0.6)
         }
+
         for effect_name in effect_names:
             # Clean up the effect name and split if there are multiple effects
             effect_names_split = [name.strip().lower() for name in effect_name.split(',')]
