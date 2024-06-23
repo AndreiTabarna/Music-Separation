@@ -8,7 +8,7 @@ import { GoogleOAuthProvider } from '@react-oauth/google';
 import projectNameGenerator from 'project-name-generator';
 
 
-const availableEffects = ['Reverb', 'Pitch Shifter'];
+const availableEffects = ['Reverb', 'Pitch Shifter', 'Chorus', 'Compressor', 'Distortion', 'Delay', 'Phaser'];
 const responseMessage = "Login successful!";
 const errorMessage = "Login failed!";
 
